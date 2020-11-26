@@ -1,0 +1,130 @@
+pragma solidity 0.4.22;
+
+contract Erc20Interface {
+string public name;
+string public symbol;
+uint8 public decimals;
+uint256 public totalSupply;
+uint256 public totalNowAccumulated;
+
+function transfer(address _to, uint256 _value) returns (bool success);
+function transferFrom(address _from, address _to, uint256 _value) returns (bool success);
+function approve(address _spender, uint256 _value) returns (bool success);
+function allowance(address _owner, address _spender) view returns (uint256 remaining);
+
+event Transfer(address indexed _from, address indexed _to, uint256 _value);
+event Approval(address indexed _owner, address indexed _spender, uint256 _value);
+}
+
+contract Erc20 is Erc20Interface {
+
+mapping (address => uint256) public balanceOf;
+mapping (address => mapping (address => uint256)) internal allowed;
+
+constructor(string _name,string _symbol,uint8 _decimals,uint256 _totalSupply) public {
+totalSupply = _totalSupply * 10 ** uint256(_decimals);
+name = _name;
+symbol = _symbol;
+decimals =_decimals;
+balanceOf[msg.sender] = totalSupply;
+}
+
+function balanceOf(address _owner) view returns (uint256 balance) {
+return balanceOf[_owner];
+}
+
+function transfer(address _to, uint _value) public returns (bool success) {
+require(_to != address(0));
+require(_value <= balanceOf[msg.sender]);
+require(balanceOf[_to] + _value >= balanceOf[_to]);
+require(_value+(SafeMath.div(SafeMath.mul(_value,1),100))<=balanceOf[msg.sender]);
+
+balanceOf[msg.sender] -= _value;
+balanceOf[_to] += _value;
+
+uint256 accumulated=(SafeMath.div(SafeMath.mul(_value,1),100));
+uint256 sumNow= SafeMath.add(totalNowAccumulated,accumulated);
+if(sumNow<=550000)
+{
+    balanceOf[msg.sender] -= accumulated;
+    totalNowAccumulated+=accumulated;
+}
+
+emit Transfer(msg.sender, _to, _value);
+return true;
+}
+
+function transferFrom(address _from, address _to, uint256 _value) returns (bool success) {
+require(_to != address(0));
+require(_value <= balanceOf[_from]);
+require(_value <= allowed[_from][msg.sender]);
+require(balanceOf[_to] + _value >= balanceOf[_to]);
+require(_value+(SafeMath.div(SafeMath.mul(_value,1),100))<=balanceOf[_from]);
+require(_value+(SafeMath.div(SafeMath.mul(_value,1),100))<=allowed[_from][msg.sender]);
+
+balanceOf[_from] -= _value;
+balanceOf[_to] += _value;
+
+allowed[_from][msg.sender] -= _value;
+
+//Deflation
+uint256 accumulated=(SafeMath.div(SafeMath.mul(_value,1),100));
+uint256 sumNow= SafeMath.add(totalNowAccumulated,accumulated);
+if(sumNow<=550000)
+{
+    balanceOf[_from] -= accumulated;
+    allowed[_from][msg.sender] -= accumulated;
+    totalNowAccumulated+=accumulated;
+}
+
+emit Transfer(_from, _to, _value);
+return true;
+}
+
+function approve(address _spender, uint256 _value) returns (bool success) {
+allowed[msg.sender][_spender] = _value;
+emit Approval(msg.sender, _spender, _value);
+return true;
+}
+
+function allowance(address _owner, address _spender) view returns (uint256 remaining) {
+return allowed[_owner][_spender];
+}
+
+}
+
+
+library SafeMath {
+    function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+        if (a == 0) {
+            return 0;
+        }
+
+        uint256 c = a * b;
+        require(c / a == b);
+        return c;
+    }
+
+    function div(uint256 a, uint256 b) internal pure returns (uint256) {
+        require(b > 0);
+        uint256 c = a / b;
+        return c;
+    }
+
+    function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+        require(b <= a);
+        uint256 c = a - b;
+        return c;
+    }
+
+    function add(uint256 a, uint256 b) internal pure returns (uint256) {
+        uint256 c = a + b;
+        require(c >= a);
+        return c;
+    }
+
+    function mod(uint256 a, uint256 b) internal pure returns (uint256) {
+        require(b != 0);
+        return a % b;
+    }
+}
